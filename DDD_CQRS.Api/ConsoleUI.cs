@@ -4,11 +4,11 @@ using DDD_CQRS.Application.Query;
 using DDD_CQRS.Domain;
 using MediatR;
 
-namespace DDD_CQRS.Api;
+namespace DDD_CQRS;
 
 public class ConsoleUI(IMediator mediator)
 {
-    private Order? _currentOrder;
+    private static Order? _currentOrder;
     private OrderStatus _currentOrderStatus = OrderStatus.Created;
     
     public void Start()
@@ -18,27 +18,48 @@ public class ConsoleUI(IMediator mediator)
         {
             ShowMainMenu();
             choice = ReadIntInput();
-            HandleMainMenuChoice(choice);
+            try
+            {
+                Console.WriteLine("\n");
+                HandleMainMenuChoice(choice);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            
         } while (choice != 0);
     }
 
     private static void ShowMainMenu()
     {
-        Console.Write(
-            """
+        Console.WriteLine();
+        if (_currentOrder is not null)
+            Console.WriteLine($"\nТекущий заказ: {_currentOrder.Id}({_currentOrder.Status}) ");
             
+        Console.WriteLine(
+            """
             =============== Система управления заказами ===============
             1. Создать новый заказ
-            2. Завершить заказ
-            3. Добавить блюдо в заказ
-            4. Изменить количество определенного блюда в заказе
-            5. Вывести все заказы 
-            6. Посмотреть историю заказов
-            7. Посмотреть отчет
-            8. Получить статус заказа
-            Выберите действие: 
+            2. Посмотреть историю заказов (последних n)
+            3. Посмотреть отчет
             """
+        );
+        
+        if (_currentOrder is not null)
+        {
+            Console.WriteLine(
+                """
+                4. Выбрать заказ
+                5. Добавить блюдо в текущий заказ
+                6. Изменить количество определенного блюда в текущем заказе
+                7. Получить статус текущего заказа
+                8. Изменить статус текущего заказа
+                """
             );
+        }
+
+        Console.Write("Выберите действие: ");
     }
     
     private void HandleMainMenuChoice(int choice)
@@ -52,27 +73,44 @@ public class ConsoleUI(IMediator mediator)
                 CreateNewOrder();
                 break;
             case 2:
-                CompleteOrder();
+                GetOrderHistory();
                 break;
             case 3:
-                Console.WriteLine("Добавить блюдо в заказ");
+                GetReport();
                 break;
             case 4:
-                Console.WriteLine("Изменить количество определенного блюда в заказе");
+                ChoiceOrder();
                 break;
             case 5:
-                GetAllOrders();
+                AddDishToOrder();
                 break;
             case 6:
-                Console.WriteLine("Посмотреть историю заказов");
+                ChangeDishesQuantityInOrderItem();
                 break;
             case 7:
-                Console.WriteLine("Посмотреть отчет");
+                GetOrderStatus();
                 break;
             case 8:
-                Console.WriteLine("Получить статус заказа");
+                ChangeOrderStatus();
                 break;
         }
+    }
+
+    private void ChoiceOrder()
+    {
+        Console.WriteLine("Все заказы:");
+        var orders = GetAllOrders();
+
+        for (var i = 0; i < orders.Count; i++)
+            Console.WriteLine($"{i + 1} -> {orders[i].Id}");
+
+        Console.Write("Выберите заказ: ");
+        var choice = ReadIntInput();
+        
+        _currentOrder = orders[choice - 1];
+        _currentOrderStatus = _currentOrder.Status;
+        
+        Console.WriteLine("Заказ выбран");
     }
 
     private void CreateNewOrder()
@@ -87,37 +125,106 @@ public class ConsoleUI(IMediator mediator)
 
         foreach (var dish in dishes)
         {
-            var quantity = 5 + random.Next(26);
+            var quantity = 1 + random.Next(5);
             orderItems.Add(OrderItem.Create(dish, quantity));
         }
 
         _currentOrder = mediator.Send(new CreateOrder { OrderItems = orderItems }).Result;
         _currentOrderStatus = _currentOrder.Status;
-        Console.WriteLine($"Создан новый заказ #{_currentOrder.Id} | Статус - {_currentOrderStatus.ToRussianString()}");
     }
 
-    public void CompleteOrder()
+    private void GetOrderHistory()
     {
-        Console.Write("Введите Id заказа: ");
-        var id = ReadGuidInput();
-
-        mediator.Send(new CompleteOrder { OrderId = id });
-        Console.WriteLine("Заказ успешно завершен");
+        Console.Write("Введите кол-во заказов: ");
+        var numberDays = ReadIntInput();
+        
+        var history = mediator.Send(new GetOrderHistory { NumberDays = numberDays }).Result;
+        
+        if (history.Count > 0)
+            Console.Write(FormatOrdersTable(history));
+        else
+            Console.WriteLine("В данный момент нет ни одного заказа");
     }
 
-    public void GetAllOrders()
+    private void GetReport()
     {
-        var order = mediator.Send(new GetAllOrders()).Result;
+        var report = mediator.Send(new GetReport()).Result;
 
-        Console.WriteLine(FormatOrdersTable(order));
+        Console.WriteLine();
+        Console.WriteLine(report);
     }
+
+    private void AddDishToOrder()
+    {
+        Console.Write("Введите название блюда: ");
+        var name = Console.ReadLine() ?? throw new ArgumentException("Введите название");
+        Console.Write("Введите цену блюда: ");
+        var price = decimal.Parse(Console.ReadLine()!);
+        Console.Write("Введите количество блюда: ");
+        var quantity = ReadIntInput();
+
+        mediator.Send(new AddDishToOrder
+        {
+            OrderId = _currentOrder!.Id,
+            Name = name,
+            Price = price,
+            Quantity = quantity
+        }).Wait();
+        
+        _currentOrderStatus = _currentOrder.Status;
+    }
+
+    private void ChangeDishesQuantityInOrderItem()
+    {
+        var items = _currentOrder!.Items;
+        
+        Console.WriteLine("Выберете продукт для изменения количества: ");
+        for (var i = 0; i < items.Count ; i++)
+            Console.WriteLine($"{i + 1} -> {items[i]}");
+
+        Console.Write("Выберете блюдо: ");
+        var choice = ReadIntInput();
+
+        Console.Write("Новое количество: ");
+        var quantity = ReadIntInput();
+
+        mediator.Send(new ChangeDishesQuantityInOrderItem
+        {
+            OrderId = _currentOrder.Id,
+            DishId = items[choice - 1].Dish.Id,
+            NewQuantity = quantity
+        }).Wait();
+    }
+
+    private void GetOrderStatus() =>
+        Console.WriteLine($"{mediator.Send(new GetOrderStatus { OrderId = _currentOrder!.Id }).Result}");
+
+    private void ChangeOrderStatus()
+    {
+        var statuses = Enum.GetValues(typeof(OrderStatus)).Cast<OrderStatus>().ToArray();
+        Console.WriteLine("Доступные статусы:");
+        for (var i = 0; i < statuses.Length; i++)
+            Console.WriteLine($"{i + 1} -> {statuses[i].ToRussianString()}");
+        
+        Console.WriteLine("Выберите новый статус:");
+        var choice = ReadIntInput();
+        
+        mediator.Send(new ChangeOrderStatus { OrderId = _currentOrder!.Id, OrderStatus = statuses[choice - 1] }).Wait();
+    }
+
+    private IReadOnlyList<Order> GetAllOrders() => mediator.Send(new GetAllOrders()).Result;
     
     private static string FormatOrdersTable(IReadOnlyList<Order> orders)
     {
-        var sb = new StringBuilder();
+        var sb = new StringBuilder().Append('\n');
 
-        foreach (var order in orders)
-            sb.AppendLine(order.ToString());
+        for (var i = 0; i < orders.Count; i++)
+        {
+            sb.AppendLine(orders[i].ToString());
+        
+            if (i < orders.Count - 1)
+                sb.AppendLine("---------------------------------------------------------\n");
+        }
     
         return sb.ToString();
     }

@@ -12,8 +12,10 @@ public class AddDishToOrderHandler(IOrderRepository orderRepo) : IRequestHandler
         var order = orderRepo
             .FindById(command.OrderId)
              ?? throw new NullReferenceException("Заказ не найден");
+
+        var dish = Dish.Create(Guid.NewGuid(), command.Name, command.Price);
         
-        order.AddItem(Dish.Create(Guid.NewGuid(), command.Name, command.Price), command.Quantity);
+        order.AddItem(dish, command.Quantity);
         orderRepo.AddOrSaveChanges(order);
         
         return Task.CompletedTask;

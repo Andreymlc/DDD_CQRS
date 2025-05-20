@@ -1,6 +1,6 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-using DDD_CQRS.Api;
+using DDD_CQRS;
 using DDD_CQRS.Application;
 using DDD_CQRS.Domain.Repository;
 using DDD_CQRS.Infrastructure.Repository;

@@ -3,7 +3,7 @@ using MediatR;
 
 namespace DDD_CQRS.Application.Query;
 
-public class GetOrderHistory : IRequest<IEnumerable<Order>>
+public class GetOrderHistory : IRequest<IReadOnlyList<Order>>
 {
-    public required int Number { get; init; }
+    public required int NumberDays { get; init; }
 }

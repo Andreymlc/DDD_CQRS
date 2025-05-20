@@ -1,4 +1,5 @@
 using System.Text;
+using DDD_CQRS.Domain.Events;
 
 namespace DDD_CQRS.Domain;
 
@@ -9,7 +10,7 @@ public class Order : Entity<Guid>
     public OrderStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; }
     public IReadOnlyList<OrderItem> Items => _items.AsReadOnly();
-    
+
     private readonly List<OrderItem> _items;
 
     public Order(IEnumerable<OrderItem> dishes)
@@ -19,14 +20,25 @@ public class Order : Entity<Guid>
         CreatedAt = DateTimeOffset.Now;
         Status = OrderStatus.Created;
         Cost = CalculateTotalPrice();
+        AddDomainEvent(new OrderCreated { Order = this, Description = $"Заказ с id '{Id}' создан" });
     }
 
     public void AddItem(Dish dish, int quantity)
     {
         ArgumentNullException.ThrowIfNull(dish);
-        if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity), "Количество должно быть положительным");
+        if (quantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Количество должно быть положительным");
 
         _items.Add(OrderItem.Create(dish, quantity));
+        
+        AddDomainEvent(new DishAddedToOrderEvent
+        {
+            DishId = dish.Id,
+            Name = dish.Name,
+            Quantity = quantity,
+            Description = $"Блюдо {dish.Name} было добавлено в заказ в количестве {quantity} шт"
+        });
+        
         Cost = CalculateTotalPrice();
     }
 
@@ -35,6 +47,14 @@ public class Order : Entity<Guid>
         var itemForChange = _items
                                 .FirstOrDefault(item => item.Dish.Id == dishId)
                                  ?? throw new NullReferenceException("Блюдо не найден");
+
+        AddDomainEvent(new DishesQuantityInOrderItemChanged
+        {
+            DishId = itemForChange.Dish.Id,
+            Name = itemForChange.Dish.Name,
+            Quantity = newQuantity,
+            Description = $"Количество {itemForChange.Dish.Name} в заказе изменено на {newQuantity}"
+        });
         
         itemForChange.ChangeDishesQuantity(newQuantity);
     }
@@ -42,9 +62,9 @@ public class Order : Entity<Guid>
     public void RemoveItem(Guid dishId)
     {
         var itemForRemove = _items
-            .FirstOrDefault(item => item.Dish.Id == dishId)
-             ?? throw new NullReferenceException("Блюдо не найден");
-        
+                                .FirstOrDefault(item => item.Dish.Id == dishId)
+                            ?? throw new NullReferenceException("Блюдо не найден");
+
         _items.Remove(itemForRemove);
         Cost = CalculateTotalPrice();
     }
@@ -55,9 +75,12 @@ public class Order : Entity<Guid>
             throw new InvalidOperationException($"Недопустимый переход статуса:" +
                                                 $" {Status.ToRussianString()} -> {newStatus.ToRussianString()}");
 
+        if (newStatus is OrderStatus.Completed)
+            AddDomainEvent(new OrderCompleted { Description = $"Заказ '{Id}' завершен"});
+        
         Status = newStatus;
     }
-    
+
     private static bool IsValidStatusTransition(OrderStatus current, OrderStatus next)
     {
         return current switch
@@ -68,9 +91,9 @@ public class Order : Entity<Guid>
             _ => false
         };
     }
-    
+
     public decimal CalculateTotalPrice() => _items.Sum(item => item.TotalPrice);
-    
+
     public override string ToString()
     {
         var sb = new StringBuilder();
@@ -82,10 +105,10 @@ public class Order : Entity<Guid>
         sb.AppendLine($" Дата создания: {CreatedAt:dd.MM.yyyy HH:mm}{"",12}");
         sb.AppendLine("++++++++++++++++++++++++++++++++++++++++++++++");
         sb.AppendLine($" Блюда:{"",32}");
-    
+
         foreach (var item in _items)
-            sb.AppendLine($"   • {item.Dish.Name,-25} × {item.Quantity,2} ");
-    
+            sb.AppendLine($"   • {item.Dish.Name,-25} × {item.Quantity,3} ({item.TotalPrice:C}) ");
+
         sb.AppendLine("++++++++++++++++++++++++++++++++++++++++++++++");
         return sb.ToString();
     }

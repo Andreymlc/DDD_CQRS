@@ -20,6 +20,8 @@ public class OrderCompletedHandler(IReportRepository reportRepo) : INotification
         
         reportRepo.UpdateReport(report);
         
+        notification.PrintInfo();
+        
         return Task.CompletedTask;
     }
 }

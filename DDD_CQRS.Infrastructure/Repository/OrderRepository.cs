@@ -18,5 +18,7 @@ public class OrderRepository(IMediator mediator) : IOrderRepository
         
         foreach (var domainEvent in order.DomainEvents)
             mediator.Publish(domainEvent);
+        
+        order.ClearDomainEvents();
     }
 }

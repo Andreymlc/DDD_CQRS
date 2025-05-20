@@ -5,15 +5,15 @@ using MediatR;
 
 namespace DDD_CQRS.Application.CommandHandler;
 
-public class CompleteOrderHandler(IOrderRepository orderRepo) : IRequestHandler<CompleteOrder>
+public class ChangeOrderStatusHandler(IOrderRepository orderRepo) : IRequestHandler<ChangeOrderStatus>
 {
-    public Task Handle(CompleteOrder command, CancellationToken cancellationToken)
+    public Task Handle(ChangeOrderStatus command, CancellationToken cancellationToken)
     {
         var order = orderRepo
                         .FindById(command.OrderId)
                          ?? throw new NullReferenceException("Заказ не найден");
         
-        order.ChangeStatus(OrderStatus.Completed);
+        order.ChangeStatus(command.OrderStatus);
         orderRepo.AddOrSaveChanges(order);
         
         return Task.CompletedTask;

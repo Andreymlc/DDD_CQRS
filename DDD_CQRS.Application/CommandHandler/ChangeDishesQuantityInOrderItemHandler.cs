@@ -13,7 +13,7 @@ public class ChangeDishesQuantityInOrderItemHandler(IOrderRepository orderRepo)
                         .FindById(command.OrderId)
                          ?? throw new NullReferenceException("Заказ не найден");
         
-        order.ChangeDishesQuantityInOrderItem(command.NewQuantity, command.OrderId);
+        order.ChangeDishesQuantityInOrderItem(command.NewQuantity, command.DishId);
         orderRepo.AddOrSaveChanges(order);
         
         return Task.CompletedTask;

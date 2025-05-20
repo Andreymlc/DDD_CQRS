@@ -5,6 +5,7 @@ public class Report
     public int NumberOrders { get; init; }
     public decimal Income { get; init; }
     public int NumberCompletedOrders { get; init; }
+    public (string Name, int Quantity) MostPopularProducts { get; init; }
     public DateTimeOffset CurrentDate { get; } = DateTimeOffset.Now;
 
     public override string ToString() =>
@@ -13,7 +14,9 @@ public class Report
          Дата: {CurrentDate:g}
          Заказов получено: {NumberOrders}
          Заказов выполнено: {NumberCompletedOrders}
-         Доход: {Income}
+         Доход: {Income:C}
+         
+         Самый популярный продукт: {MostPopularProducts.Name, -10} × {MostPopularProducts.Quantity, -3}
          +++++++++++++++++++++++++++++++++++++++++++++++++++
          """;
 }
