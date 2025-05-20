@@ -35,7 +35,7 @@ public class ConsoleUI(IMediator mediator)
     {
         Console.WriteLine();
         if (_currentOrder is not null)
-            Console.WriteLine($"\nТекущий заказ: {_currentOrder.Id}({_currentOrder.Status}) ");
+            Console.WriteLine($"\nТекущий заказ: {_currentOrder.Id}({_currentOrder.Status.ToRussianString()}) ");
             
         Console.WriteLine(
             """
@@ -197,7 +197,7 @@ public class ConsoleUI(IMediator mediator)
     }
 
     private void GetOrderStatus() =>
-        Console.WriteLine($"{mediator.Send(new GetOrderStatus { OrderId = _currentOrder!.Id }).Result}");
+        Console.WriteLine($"Статус: {mediator.Send(new GetOrderStatus { OrderId = _currentOrder!.Id }).Result.ToRussianString()}");
 
     private void ChangeOrderStatus()
     {
